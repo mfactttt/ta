@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Локация • Пиры без сервера</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0f0f;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: #fff;
+        }
+
+        /* Верхняя панель */
+        .top-bar {
+            background: #141c1c;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 2px solid #2a9d8f;
+            flex-wrap: wrap;
+            z-index: 1000;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .live-dot {
+            width: 14px;
+            height: 14px;
+            background: #2a9d8f;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.3); }
+            100% { opacity: 0.5; transform: scale(1); }
+        }
+
+        h2 {
+            font-size: 1.4rem;
+            font-weight: 400;
+        }
+
+        h2 span {
+            color: #2a9d8f;
+            font-weight: 700;
+            text-shadow: 0 0 10px #2a9d8f;
+        }
+
+        .counter {
+            background: #1e2a2a;
+            padding: 5px 15px;
+            border-radius: 30px;
+            margin-left: auto;
+            border: 1px solid #2a9d8f50;
+        }
+
+        .name-input {
+            background: #1e2a2a;
+            border: 1px solid #3a5a5a;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            outline: none;
+            width: 140px;
+        }
+
+        .name-input:focus {
+            border-color: #2a9d8f;
+        }
+
+        .share-btn {
+            background: #2a9d8f;
+            color: #0a0f0f;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .share-btn:hover {
+            background: #3bb9aa;
+            box-shadow: 0 0 15px #2a9d8f;
+        }
+
+        #map {
+            height: calc(100vh - 110px);
+            width: 100%;
+            z-index: 1;
+        }
+
+        .bottom-panel {
+            background: #141c1c;
+            padding: 8px 20px;
+            font-size: 0.8rem;
+            color: #8a9a9a;
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid #2a9d8f30;
+        }
+
+        /* Стили для маркеров */
+        .my-marker div {
+            width: 24px;
+            height: 24px;
+            background: #2a9d8f;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 20px #2a9d8f;
+            animation: markerPulse 2s infinite;
+        }
+
+        .other-marker div {
+            width: 18px;
+            height: 18px;
+            background: #ffaa33;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 15px #ffaa33;
+        }
+
+        @keyframes markerPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .leaflet-container {
+            background: #1a2424;
+        }
+
+        .popup-custom .leaflet-popup-content-wrapper {
+            background: #1f2a2a;
+            color: white;
+            border-left: 4px solid #2a9d8f;
+            border-radius: 12px;
+        }
+
+        .popup-custom .leaflet-popup-tip {
+            background: #1f2a2a;
+        }
+
+        .update-btn {
+            background: #2a9d8f;
+            color: black;
+            border: none;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            margin-left: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <div class="logo">
+        <div class="live-dot"></div>
+        <h2>📍 <span>P2P</span> MAP</h2>
+    </div>
+    
+    <input type="text" id="userName" class="name-input" placeholder="Ваше имя" maxlength="20" value="Аноним">
+
+    <div class="counter" id="userCounter">
+        👥 1 онлайн
+    </div>
+
+    <button class="share-btn" id="shareBtn">🔗 Поделиться</button>
+</div>
+
+<div id="map"></div>
+
+<div class="bottom-panel">
+    <span>🔄 Обновление каждые 5 сек</span>
+    <span>⚡ Работает без сервера (URL + localStorage)</span>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    (function() {
+        // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
+        const map = L.map('map');
+        let myMarker = null;
+        let myId = generateId();
+        let myName = localStorage.getItem('userName') || 'Аноним_' + Math.floor(Math.random() * 1000);
+        let myLat = null;
+        let myLon = null;
+        let users = {}; // { id: { name, lat, lon, marker } }
+        
+        // Инициализация имени
+        document.getElementById('userName').value = myName;
+        
+        // ========== ГЕНЕРАЦИЯ УНИКАЛЬНОГО ID ==========
+        function generateId() {
+            let id = localStorage.getItem('userId');
+            if (!id) {
+                id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('userId', id);
+            }
+            return id;
+        }
+
+        // ========== НАСТРОЙКА КАРТЫ ==========
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap, CartoDB'
+        }).addTo(map);
+
+        // ========== ПОЛУЧЕНИЕ ГЕОЛОКАЦИИ ==========
+        function getLocation() {
+            if (!navigator.geolocation) {
+                alert('Геолокация не поддерживается');
+                initMap(55.7558, 37.6173); // Москва по умолчанию
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    myLat = position.coords.latitude;
+                    myLon = position.coords.longitude;
+                    
+                    // Центрируем карту
+                    map.setView([myLat, myLon], 13);
+                    
+                    // Создаём свой маркер
+                    createMyMarker(myLat, myLon);
+                    
+                    // Загружаем других пользователей из URL
+                    loadUsersFromURL();
+                    
+                    // Начинаем синхронизацию
+                    startSync();
+                },
+                (error) => {
+                    console.warn('Ошибка геолокации:', error.message);
+                    // Карта по умолчанию
+                    map.setView([55.7558, 37.6173], 10);
+                    createMyMarker(55.7558, 37.6173);
+                    loadUsersFromURL();
+                    startSync();
+                }
+            );
+        }
+
+        // ========== СОЗДАНИЕ СВОЕГО МАРКЕРА ==========
+        function createMyMarker(lat, lon) {
+            if (myMarker) map.removeLayer(myMarker);
+            
+            myMarker = L.marker([lat, lon], {
+                icon: L.divIcon({
+                    className: 'my-marker',
+                    html: '<div></div>',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                })
+            }).addTo(map).bindPopup(`
+                <b>Это вы</b><br>
+                ${myName}<br>
+                <button class="update-btn" onclick="updateMyPosition()">🔄 Обновить</button>
+            `);
+        }
+
+        // ========== СОЗДАНИЕ МАРКЕРА ДРУГОГО ПОЛЬЗОВАТЕЛЯ ==========
+        function createOtherMarker(id, name, lat, lon) {
+            const marker = L.marker([lat, lon], {
+                icon: L.divIcon({
+                    className: 'other-marker',
+                    html: '<div></div>',
+                    iconSize: [18, 18],
+                    iconAnchor: [9, 9]
+                })
+            }).addTo(map).bindPopup(`
+                <b>${name || 'Аноним'}</b><br>
+                <small>ID: ${id.substr(0, 6)}...</small>
+            `);
+            
+            users[id] = { name, lat, lon, marker };
+            updateCounter();
+            return marker;
+        }
+
+        // ========== СОХРАНЕНИЕ ВСЕХ В URL ==========
+        function saveToURL() {
+            // Добавляем себя в список
+            const allUsers = { ...users };
+            allUsers[myId] = { name: myName, lat: myLat, lon: myLon };
+            
+            // Кодируем в base64 для компактности
+            const dataStr = btoa(JSON.stringify(allUsers));
+            
+            // Обновляем URL без перезагрузки
+            const url = new URL(window.location);
+            url.hash = dataStr;
+            history.replaceState(null, '', url);
+        }
+
+        // ========== ЗАГРУЗКА ИЗ URL ==========
+        function loadUsersFromURL() {
+            const hash = window.location.hash.slice(1); // убираем #
+            if (!hash) return;
+
+            try {
+                const data = JSON.parse(atob(hash));
+                
+                // Очищаем старых пользователей (кроме себя)
+                Object.keys(users).forEach(id => {
+                    if (id !== myId && users[id].marker) {
+                        map.removeLayer(users[id].marker);
+                    }
+                });
+                users = {};
+                
+                // Добавляем всех из URL
+                Object.entries(data).forEach(([id, user]) => {
+                    if (id !== myId && user.lat && user.lon) {
+                        createOtherMarker(id, user.name, user.lat, user.lon);
+                    }
+                });
+                
+                updateCounter();
+            } catch (e) {
+                console.warn('Ошибка загрузки из URL:', e);
+            }
+        }
+
+        // ========== СИНХРОНИЗАЦИЯ ==========
+        function startSync() {
+            // Сохраняем сразу
+            saveToURL();
+            
+            // Обновляем каждые 5 секунд
+            setInterval(() => {
+                // Обновляем своё местоположение (опционально)
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            myLat = position.coords.latitude;
+                            myLon = position.coords.longitude;
+                            myMarker.setLatLng([myLat, myLon]);
+                            saveToURL();
+                        },
+                        null,
+                        { maximumAge: 30000 }
+                    );
+                } else {
+                    saveToURL();
+                }
+                
+                // Загружаем новых из URL (кто-то мог добавиться)
+                loadUsersFromURL();
+            }, 5000);
+            
+            // Слушаем изменения URL от других (когда они меняют)
+            window.addEventListener('hashchange', loadUsersFromURL);
+        }
+
+        // ========== ОБНОВЛЕНИЕ СЧЁТЧИКА ==========
+        function updateCounter() {
+            const count = Object.keys(users).length + 1; // + себя
+            document.getElementById('userCounter').innerHTML = `👥 ${count} онлайн`;
+        }
+
+        // ========== ОБНОВЛЕНИЕ ПОЗИЦИИ (КНОПКА) ==========
+        window.updateMyPosition = function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        myLat = position.coords.latitude;
+                        myLon = position.coords.longitude;
+                        myMarker.setLatLng([myLat, myLon]);
+                        saveToURL();
+                        alert('Позиция обновлена!');
+                    }
+                );
+            }
+        };
+
+        // ========== СМЕНА ИМЕНИ ==========
+        document.getElementById('userName').addEventListener('input', (e) => {
+            myName = e.target.value || 'Аноним';
+            localStorage.setItem('userName', myName);
+            saveToURL();
+            
+            // Обновляем свой попап
+            if (myMarker) {
+                myMarker.setPopupContent(`
+                    <b>Это вы</b><br>
+                    ${myName}<br>
+                    <button class="update-btn" onclick="updateMyPosition()">🔄 Обновить</button>
+                `);
+            }
+        });
+
+        // ========== КНОПКА ПОДЕЛИТЬСЯ ==========
+        document.getElementById('shareBtn').addEventListener('click', () => {
+            // Принудительно сохраняем
+            saveToURL();
+            
+            // Копируем ссылку
+            const url = window.location.href;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('✅ Ссылка скопирована!\nОтправьте её друзьям — они увидят вас на карте');
+            }).catch(() => {
+                prompt('Скопируйте ссылку вручную:', url);
+            });
+        });
+
+        // ========== ЗАПУСК ==========
+        getLocation();
+
+        // Добавляем стили для кнопки в попапе (глобально)
+        const style = document.createElement('style');
+        style.innerHTML = `
+            .update-btn {
+                background: #2a9d8f;
+                border: none;
+                color: black;
+                padding: 4px 10px;
+                border-radius: 20px;
+                font-weight: bold;
+                cursor: pointer;
+                margin-top: 5px;
+            }
+            .update-btn:hover {
+                background: #3bb9aa;
+            }
+        `;
+        document.head.appendChild(style);
+    })();
+</script>
+
+</body>
+</html>
