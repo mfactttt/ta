@@ -1,455 +1,762 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Локация • Пиры без сервера</title>
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=yes"
+    />
+    <title>Сердечная галерея — твои фото</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+      /* ---------- ГЛОБАЛЬНЫЙ РОЗОВЫЙ ФОН НА ВСЮ СТРАНИЦУ ---------- */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #0a0f0f;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            color: #fff;
-        }
+      /* Фон на всю страницу — именно розовый, с мягким градиентом для нежности */
+      body {
+        min-height: 100vh;
+        width: 100%;
+        background: radial-gradient(circle at 20% 30%, #ffe6f0, #ffd9e8);
+        /* дополнительная защита: если градиент не нравится — сплошной розовый */
+        background-attachment: fixed;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family:
+          system-ui, "Segoe UI", "Roboto", "Helvetica Neue", sans-serif;
+        padding: 20px;
+      }
 
-        /* Верхняя панель */
-        .top-bar {
-            background: #141c1c;
-            padding: 12px 20px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            border-bottom: 2px solid #2a9d8f;
-            flex-wrap: wrap;
-            z-index: 1000;
-        }
+      /* ----- стили для самого контейнера-обертки (контент центрирован) ----- */
+      /* wrap уже центрируется через флекс body, но продублируем и внутри страховку */
+      .wrap {
+        width: 100%;
+        max-width: 700px;
+        margin: 0 auto;
+        background: linear-gradient(
+          145deg,
+          #fff0f6 0%,
+          #ffe4ef 50%,
+          #fff6f9 100%
+        );
+        border-radius: 48px 48px 56px 56px;
+        padding: clamp(1.2rem, 5vw, 2.5rem) clamp(1rem, 4vw, 2rem);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 20px 40px rgba(255, 80, 120, 0.15);
+        backdrop-filter: blur(0px);
+        transition: all 0.2s;
+      }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
+      /* Остальные стили (анимации, сердечко, фото-кольца) — без изменений, но адаптированы под локальные фото */
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0) rotate(0deg);
         }
+        50% {
+          transform: translateY(-14px) rotate(4deg);
+        }
+      }
+      @keyframes heartbeat {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        25% {
+          transform: scale(1.15);
+        }
+        50% {
+          transform: scale(1.05);
+        }
+        75% {
+          transform: scale(1.2);
+        }
+      }
+      @keyframes pulse-ring {
+        0% {
+          transform: scale(0.8);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(2.4);
+          opacity: 0;
+        }
+      }
+      @keyframes shimmer {
+        0% {
+          background-position: -200% center;
+        }
+        100% {
+          background-position: 200% center;
+        }
+      }
+      @keyframes glowPulse {
+        0%,
+        100% {
+          box-shadow: 0 0 16px rgba(255, 100, 150, 0.4);
+        }
+        50% {
+          box-shadow:
+            0 0 48px rgba(255, 100, 150, 0.8),
+            0 0 80px rgba(255, 160, 200, 0.4);
+        }
+      }
+      @keyframes popIn {
+        0% {
+          opacity: 0;
+          transform: scale(0.5) rotate(-4deg);
+        }
+        65% {
+          transform: scale(1.07) rotate(1deg);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1) rotate(0deg);
+        }
+      }
+      @keyframes petalFall {
+        0% {
+          transform: translateY(-30px) rotate(0deg);
+          opacity: 1;
+        }
+        100% {
+          transform: translateY(130vh) rotate(720deg);
+          opacity: 0;
+        }
+      }
+      @keyframes sparkle {
+        0%,
+        100% {
+          opacity: 0;
+          transform: scale(0);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      @keyframes photoFloat {
+        0%,
+        100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-6px);
+        }
+      }
 
-        .live-dot {
-            width: 14px;
-            height: 14px;
-            background: #2a9d8f;
-            border-radius: 50%;
-            animation: pulse 1.5s infinite;
-        }
+      .petal {
+        position: fixed;
+        pointer-events: none;
+        animation: petalFall linear forwards;
+        z-index: 9999;
+      }
+      .sdot {
+        position: absolute;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #ff6b9d;
+        animation: sparkle 1.6s ease-in-out infinite;
+        z-index: 20;
+      }
+      .deco {
+        position: absolute;
+        pointer-events: none;
+        opacity: 0.18;
+        animation: float ease-in-out infinite;
+      }
+      .orbit-area {
+        position: relative;
+        width: min(90vw, 420px);
+        height: min(90vw, 420px);
+        margin: 0 auto clamp(1rem, 3vw, 1.6rem);
+        flex-shrink: 0;
+      }
+      .photo-slot {
+        position: absolute;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 3px solid white;
+        box-shadow: 0 4px 18px rgba(255, 80, 140, 0.35);
+        background: linear-gradient(135deg, #ffcce0, #ffaacb);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s;
+        cursor: pointer;
+        backdrop-filter: blur(0px);
+      }
+      .photo-slot:hover {
+        transform: scale(1.02);
+        box-shadow: 0 8px 22px rgba(255, 60, 110, 0.5);
+      }
+      .photo-slot img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      /* заглушка эмодзи, пока нет фото */
+      .photo-slot span {
+        font-size: 1.5rem;
+        font-weight: normal;
+        opacity: 0.8;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
 
-        @keyframes pulse {
-            0% { opacity: 0.5; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.3); }
-            100% { opacity: 0.5; transform: scale(1); }
-        }
+      .heart-center {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 15;
+      }
+      .ring-pulse {
+        position: absolute;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 100, 150, 0.5);
+        pointer-events: none;
+      }
+      .hbtn {
+        width: clamp(80px, 22vw, 104px);
+        height: clamp(80px, 22vw, 104px);
+        border-radius: 50%;
+        background: linear-gradient(135deg, #ff6b9d, #ff3d7f);
+        border: none;
+        cursor: pointer;
+        font-size: clamp(34px, 9vw, 46px);
+        line-height: 1;
+        animation:
+          heartbeat 2.5s ease-in-out infinite,
+          glowPulse 2.5s ease-in-out infinite;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        z-index: 16;
+        transition: transform 0.12s;
+        -webkit-tap-highlight-color: transparent;
+        color: white;
+        box-shadow: 0 6px 16px rgba(255, 50, 100, 0.4);
+      }
+      .hbtn:active {
+        transform: scale(0.91) !important;
+      }
 
-        h2 {
-            font-size: 1.4rem;
-            font-weight: 400;
-        }
+      .sublabel {
+        font-size: clamp(11px, 2.5vw, 13px);
+        color: #d4547e;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin: 0 0 0.3rem;
+        font-weight: 500;
+        opacity: 0.85;
+        text-align: center;
+      }
+      .title {
+        font-size: clamp(16px, 4.5vw, 24px);
+        font-weight: 600;
+        color: #c0396a;
+        margin: 0 0 1rem;
+        text-align: center;
+        background: linear-gradient(90deg, #c0396a, #e8608a, #c0396a);
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: shimmer 3s linear infinite;
+      }
+      .card {
+        display: none;
+        max-width: min(400px, 92vw);
+        width: 100%;
+        background: rgba(255, 255, 255, 0.94);
+        backdrop-filter: blur(2px);
+        border-radius: 34px;
+        padding: clamp(1rem, 3.5vw, 1.6rem) clamp(1rem, 4vw, 1.8rem);
+        border: 1px solid rgba(255, 150, 190, 0.5);
+        box-shadow: 0 12px 32px rgba(255, 100, 150, 0.18);
+        text-align: center;
+        margin-bottom: 0.6rem;
+      }
+      .cemoji {
+        font-size: clamp(26px, 7vw, 36px);
+        margin-bottom: 0.5rem;
+      }
+      .ctext {
+        font-size: clamp(13px, 3.5vw, 16px);
+        color: #b32e5e;
+        line-height: 1.75;
+        margin: 0 0 0.8rem;
+        font-weight: 500;
+      }
+      .cline {
+        width: 42px;
+        height: 2.5px;
+        background: linear-gradient(90deg, #ff6b9d, #ffb3d1);
+        margin: 0 auto;
+        border-radius: 4px;
+      }
+      .counter {
+        margin-top: 0.6rem;
+        margin-bottom: 0.3rem;
+        font-size: clamp(11px, 3vw, 13px);
+        color: #d4547e;
+        opacity: 0.72;
+        display: none;
+        text-align: center;
+      }
 
-        h2 span {
-            color: #2a9d8f;
-            font-weight: 700;
-            text-shadow: 0 0 10px #2a9d8f;
+      /* адаптация для маленьких экранов */
+      @media (max-width: 480px) {
+        .wrap {
+          padding: 1.2rem 1rem;
+          border-radius: 36px;
         }
-
-        .counter {
-            background: #1e2a2a;
-            padding: 5px 15px;
-            border-radius: 30px;
-            margin-left: auto;
-            border: 1px solid #2a9d8f50;
-        }
-
-        .name-input {
-            background: #1e2a2a;
-            border: 1px solid #3a5a5a;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            outline: none;
-            width: 140px;
-        }
-
-        .name-input:focus {
-            border-color: #2a9d8f;
-        }
-
-        .share-btn {
-            background: #2a9d8f;
-            color: #0a0f0f;
-            border: none;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-
-        .share-btn:hover {
-            background: #3bb9aa;
-            box-shadow: 0 0 15px #2a9d8f;
-        }
-
-        #map {
-            height: calc(100vh - 110px);
-            width: 100%;
-            z-index: 1;
-        }
-
-        .bottom-panel {
-            background: #141c1c;
-            padding: 8px 20px;
-            font-size: 0.8rem;
-            color: #8a9a9a;
-            display: flex;
-            justify-content: space-between;
-            border-top: 1px solid #2a9d8f30;
-        }
-
-        /* Стили для маркеров */
-        .my-marker div {
-            width: 24px;
-            height: 24px;
-            background: #2a9d8f;
-            border: 3px solid white;
-            border-radius: 50%;
-            box-shadow: 0 0 20px #2a9d8f;
-            animation: markerPulse 2s infinite;
-        }
-
-        .other-marker div {
-            width: 18px;
-            height: 18px;
-            background: #ffaa33;
-            border: 2px solid white;
-            border-radius: 50%;
-            box-shadow: 0 0 15px #ffaa33;
-        }
-
-        @keyframes markerPulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); }
-        }
-
-        .leaflet-container {
-            background: #1a2424;
-        }
-
-        .popup-custom .leaflet-popup-content-wrapper {
-            background: #1f2a2a;
-            color: white;
-            border-left: 4px solid #2a9d8f;
-            border-radius: 12px;
-        }
-
-        .popup-custom .leaflet-popup-tip {
-            background: #1f2a2a;
-        }
-
-        .update-btn {
-            background: #2a9d8f;
-            color: black;
-            border: none;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 0.7rem;
-            margin-left: 5px;
-            cursor: pointer;
-        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
+    <div id="petals"></div>
 
-<div class="top-bar">
-    <div class="logo">
-        <div class="live-dot"></div>
-        <h2>📍 <span>P2P</span> MAP</h2>
+    <div class="wrap" id="wrap">
+      <div
+        class="deco"
+        style="top: 14px; left: 22px; font-size: 26px; animation-duration: 4s"
+      >
+        💗
+      </div>
+      <div
+        class="deco"
+        style="
+          top: 50px;
+          right: 30px;
+          font-size: 20px;
+          animation-duration: 5s;
+          animation-delay: 1s;
+        "
+      >
+        💕
+      </div>
+      <div
+        class="deco"
+        style="
+          bottom: 30px;
+          left: 36px;
+          font-size: 20px;
+          animation-duration: 6s;
+          animation-delay: 0.5s;
+        "
+      >
+        🌸
+      </div>
+      <div
+        class="deco"
+        style="
+          bottom: 50px;
+          right: 22px;
+          font-size: 18px;
+          animation-duration: 4.5s;
+          animation-delay: 2s;
+        "
+      >
+        ✨
+      </div>
+
+      <p class="sublabel">специально для тебя</p>
+      <h1 class="title">нажми на сердечко ✨</h1>
+
+      <div class="orbit-area" id="orbit-area">
+        <!-- ========= ВНЕШНЕЕ КОЛЬЦО (6 фото) ========= -->
+        <!-- Фото 1 -->
+        <div class="photo-slot" id="o1">
+          <!-- 📸 эмодзи-заглушка показывается, если нет img. Раскомментируйте img и пропишите локальный путь -->
+          <!-- <img src="img/photo1.jpg" alt="ваше фото"> -->
+          <span>📸</span>
+        </div>
+        <!-- Фото 2 -->
+        <div class="photo-slot" id="o2"><span>📸</span></div>
+        <!-- Фото 3 -->
+        <div class="photo-slot" id="o3"><span>📸</span></div>
+        <!-- Фото 4 -->
+        <div class="photo-slot" id="o4"><span>📸</span></div>
+        <!-- Фото 5 -->
+        <div class="photo-slot" id="o5"><span>📸</span></div>
+        <!-- Фото 6 -->
+        <div class="photo-slot" id="o6"><span>📸</span></div>
+
+        <!-- ========= ВНУТРЕННЕЕ КОЛЬЦО (5 фото) ========= -->
+        <!-- Фото 7 -->
+        <div class="photo-slot" id="i1"><span>📸</span></div>
+        <!-- Фото 8 -->
+        <div class="photo-slot" id="i2"><span>📸</span></div>
+        <!-- Фото 9 -->
+        <div class="photo-slot" id="i3"><span>📸</span></div>
+        <!-- Фото 10 -->
+        <div class="photo-slot" id="i4"><span>📸</span></div>
+        <!-- Фото 11 -->
+        <div class="photo-slot" id="i5"><span>📸</span></div>
+
+        <!-- сердечко -->
+        <div class="heart-center">
+          <div
+            style="
+              position: relative;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            "
+          >
+            <div
+              class="ring-pulse"
+              style="
+                width: clamp(76px, 21vw, 96px);
+                height: clamp(76px, 21vw, 96px);
+                animation: pulse-ring 2s ease-out infinite;
+              "
+            ></div>
+            <div
+              class="ring-pulse"
+              style="
+                width: clamp(76px, 21vw, 96px);
+                height: clamp(76px, 21vw, 96px);
+                animation: pulse-ring 2s ease-out infinite 0.65s;
+              "
+            ></div>
+            <div class="sdot" style="top: -3px; left: 20%"></div>
+            <div
+              class="sdot"
+              style="
+                top: 10%;
+                right: 16%;
+                background: #ffb3d1;
+                animation-delay: 0.5s;
+              "
+            ></div>
+            <div
+              class="sdot"
+              style="
+                bottom: 3px;
+                left: 16%;
+                background: #ff8cb5;
+                animation-delay: 1s;
+              "
+            ></div>
+            <div
+              class="sdot"
+              style="bottom: -3px; right: 20%; animation-delay: 1.5s"
+            ></div>
+            <button
+              class="hbtn"
+              onclick="showCompliment()"
+              onmousedown="this.style.transform = 'scale(0.91)'"
+              onmouseup="this.style.transform = 'scale(1)'"
+              ontouchstart="this.style.transform='scale(0.91)'"
+              ontouchend="this.style.transform='scale(1)'"
+            >
+              ❤️
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="card">
+        <div class="cemoji" id="cemoji"></div>
+        <p class="ctext" id="ctext"></p>
+        <div class="cline"></div>
+      </div>
+      <p class="counter" id="counter">уже <span id="cnum">1</span> раз ❤️</p>
     </div>
-    
-    <input type="text" id="userName" class="name-input" placeholder="Ваше имя" maxlength="20" value="Аноним">
 
-    <div class="counter" id="userCounter">
-        👥 1 онлайн
-    </div>
+    <script>
+      // ---------- КОМПЛИМЕНТЫ ----------
+      const compliments = [
+        {
+          e: "🌸",
+          t: "Ты светишь ярче всех звёзд. Когда ты улыбаешься, весь мир становится теплее.",
+        },
+        {
+          e: "✨",
+          t: "Твои глаза — это отдельная вселенная, в которой я хочу потеряться навсегда.",
+        },
+        {
+          e: "🌹",
+          t: "Ты красивее самого красивого рассвета. Я бы смотрел на тебя бесконечно.",
+        },
+        {
+          e: "💫",
+          t: "Рядом с тобой я понимаю, что значит быть по-настоящему счастливым. Ты моё всё.",
+        },
+        {
+          e: "🌺",
+          t: "Ты умнее, нежнее и добрее, чем можешь себе представить. Я так горжусь тобой.",
+        },
+        {
+          e: "💝",
+          t: "Твой смех — это лучшая музыка в мире. Я бы слушал её каждый день.",
+        },
+        {
+          e: "🦋",
+          t: "Ты особенная. Именно та, о которой мечтают, но встречают одну на миллион.",
+        },
+        {
+          e: "🌙",
+          t: "Даже в самый трудный день ты остаёшься изящной и сильной. Ты моё вдохновение.",
+        },
+        {
+          e: "💖",
+          t: "Мир без тебя был бы скучным и серым. Ты добавляешь в него цвет, тепло и смысл.",
+        },
+        {
+          e: "🌟",
+          t: "Я не верил в любовь с первого взгляда, пока не встретил тебя. Ты изменила всё.",
+        },
+        {
+          e: "🍓",
+          t: "Ты такая сладкая, что рядом с тобой я забываю обо всём на свете.",
+        },
+        {
+          e: "🌷",
+          t: "Ты — моё любимое место на земле. С тобой я дома, где бы мы ни были.",
+        },
+      ];
 
-    <button class="share-btn" id="shareBtn">🔗 Поделиться</button>
-</div>
+      let count = 0;
+      let lastIdx = -1;
+      let rafId = null;
+      let outerAngle = 0;
+      let innerAngle = 0;
 
-<div id="map"></div>
+      const outerIds = ["o1", "o2", "o3", "o4", "o5", "o6", "o7", "o8", "o9"];
+      const innerIds = ["i1", "i2", "i3", "i4", "i5", "i6", "i7", "i8"];
 
-<div class="bottom-panel">
-    <span>🔄 Обновление каждые 5 сек</span>
-    <span>⚡ Работает без сервера (URL + localStorage)</span>
-</div>
-
-<!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<script>
-    (function() {
-        // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
-        const map = L.map('map');
-        let myMarker = null;
-        let myId = generateId();
-        let myName = localStorage.getItem('userName') || 'Аноним_' + Math.floor(Math.random() * 1000);
-        let myLat = null;
-        let myLon = null;
-        let users = {}; // { id: { name, lat, lon, marker } }
-        
-        // Инициализация имени
-        document.getElementById('userName').value = myName;
-        
-        // ========== ГЕНЕРАЦИЯ УНИКАЛЬНОГО ID ==========
-        function generateId() {
-            let id = localStorage.getItem('userId');
-            if (!id) {
-                id = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                localStorage.setItem('userId', id);
-            }
-            return id;
-        }
-
-        // ========== НАСТРОЙКА КАРТЫ ==========
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap, CartoDB'
-        }).addTo(map);
-
-        // ========== ПОЛУЧЕНИЕ ГЕОЛОКАЦИИ ==========
-        function getLocation() {
-            if (!navigator.geolocation) {
-                alert('Геолокация не поддерживается');
-                initMap(55.7558, 37.6173); // Москва по умолчанию
-                return;
-            }
-
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    myLat = position.coords.latitude;
-                    myLon = position.coords.longitude;
-                    
-                    // Центрируем карту
-                    map.setView([myLat, myLon], 13);
-                    
-                    // Создаём свой маркер
-                    createMyMarker(myLat, myLon);
-                    
-                    // Загружаем других пользователей из URL
-                    loadUsersFromURL();
-                    
-                    // Начинаем синхронизацию
-                    startSync();
-                },
-                (error) => {
-                    console.warn('Ошибка геолокации:', error.message);
-                    // Карта по умолчанию
-                    map.setView([55.7558, 37.6173], 10);
-                    createMyMarker(55.7558, 37.6173);
-                    loadUsersFromURL();
-                    startSync();
-                }
-            );
-        }
-
-        // ========== СОЗДАНИЕ СВОЕГО МАРКЕРА ==========
-        function createMyMarker(lat, lon) {
-            if (myMarker) map.removeLayer(myMarker);
-            
-            myMarker = L.marker([lat, lon], {
-                icon: L.divIcon({
-                    className: 'my-marker',
-                    html: '<div></div>',
-                    iconSize: [24, 24],
-                    iconAnchor: [12, 12]
-                })
-            }).addTo(map).bindPopup(`
-                <b>Это вы</b><br>
-                ${myName}<br>
-                <button class="update-btn" onclick="updateMyPosition()">🔄 Обновить</button>
-            `);
-        }
-
-        // ========== СОЗДАНИЕ МАРКЕРА ДРУГОГО ПОЛЬЗОВАТЕЛЯ ==========
-        function createOtherMarker(id, name, lat, lon) {
-            const marker = L.marker([lat, lon], {
-                icon: L.divIcon({
-                    className: 'other-marker',
-                    html: '<div></div>',
-                    iconSize: [18, 18],
-                    iconAnchor: [9, 9]
-                })
-            }).addTo(map).bindPopup(`
-                <b>${name || 'Аноним'}</b><br>
-                <small>ID: ${id.substr(0, 6)}...</small>
-            `);
-            
-            users[id] = { name, lat, lon, marker };
-            updateCounter();
-            return marker;
-        }
-
-        // ========== СОХРАНЕНИЕ ВСЕХ В URL ==========
-        function saveToURL() {
-            // Добавляем себя в список
-            const allUsers = { ...users };
-            allUsers[myId] = { name: myName, lat: myLat, lon: myLon };
-            
-            // Кодируем в base64 для компактности
-            const dataStr = btoa(JSON.stringify(allUsers));
-            
-            // Обновляем URL без перезагрузки
-            const url = new URL(window.location);
-            url.hash = dataStr;
-            history.replaceState(null, '', url);
-        }
-
-        // ========== ЗАГРУЗКА ИЗ URL ==========
-        function loadUsersFromURL() {
-            const hash = window.location.hash.slice(1); // убираем #
-            if (!hash) return;
-
-            try {
-                const data = JSON.parse(atob(hash));
-                
-                // Очищаем старых пользователей (кроме себя)
-                Object.keys(users).forEach(id => {
-                    if (id !== myId && users[id].marker) {
-                        map.removeLayer(users[id].marker);
-                    }
-                });
-                users = {};
-                
-                // Добавляем всех из URL
-                Object.entries(data).forEach(([id, user]) => {
-                    if (id !== myId && user.lat && user.lon) {
-                        createOtherMarker(id, user.name, user.lat, user.lon);
-                    }
-                });
-                
-                updateCounter();
-            } catch (e) {
-                console.warn('Ошибка загрузки из URL:', e);
-            }
-        }
-
-        // ========== СИНХРОНИЗАЦИЯ ==========
-        function startSync() {
-            // Сохраняем сразу
-            saveToURL();
-            
-            // Обновляем каждые 5 секунд
-            setInterval(() => {
-                // Обновляем своё местоположение (опционально)
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            myLat = position.coords.latitude;
-                            myLon = position.coords.longitude;
-                            myMarker.setLatLng([myLat, myLon]);
-                            saveToURL();
-                        },
-                        null,
-                        { maximumAge: 30000 }
-                    );
-                } else {
-                    saveToURL();
-                }
-                
-                // Загружаем новых из URL (кто-то мог добавиться)
-                loadUsersFromURL();
-            }, 5000);
-            
-            // Слушаем изменения URL от других (когда они меняют)
-            window.addEventListener('hashchange', loadUsersFromURL);
-        }
-
-        // ========== ОБНОВЛЕНИЕ СЧЁТЧИКА ==========
-        function updateCounter() {
-            const count = Object.keys(users).length + 1; // + себя
-            document.getElementById('userCounter').innerHTML = `👥 ${count} онлайн`;
-        }
-
-        // ========== ОБНОВЛЕНИЕ ПОЗИЦИИ (КНОПКА) ==========
-        window.updateMyPosition = function() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        myLat = position.coords.latitude;
-                        myLon = position.coords.longitude;
-                        myMarker.setLatLng([myLat, myLon]);
-                        saveToURL();
-                        alert('Позиция обновлена!');
-                    }
-                );
-            }
+      // ------------------- ФУНКЦИЯ ДЛЯ ЛОКАЛЬНЫХ ФОТО (универсальная) -------------------
+      // Чтобы удобно вставлять фото, предлагаем функцию setPhoto(elementId, imagePath)
+      // Пример: setPhoto('o1', 'images/my_photo.jpg');
+      // Если передумали — можно вернуть эмодзи через removeImg(elementId)
+      window.setPhoto = function (slotId, imageUrl) {
+        const slot = document.getElementById(slotId);
+        if (!slot) return;
+        // очищаем содержимое слота
+        slot.innerHTML = "";
+        const img = document.createElement("img");
+        img.src = imageUrl;
+        img.alt = "фото";
+        img.style.width = "100%";
+        img.style.height = "100%";
+        img.style.objectFit = "cover";
+        // обработка ошибки: если фото не загружается (неправильная ссылка), показываем заглушку 📸
+        img.onerror = () => {
+          slot.innerHTML = '<span style="font-size:20px">📸</span>';
+          console.warn(`Фото не загрузилось по ссылке: ${imageUrl}`);
         };
+        slot.appendChild(img);
+      };
 
-        // ========== СМЕНА ИМЕНИ ==========
-        document.getElementById('userName').addEventListener('input', (e) => {
-            myName = e.target.value || 'Аноним';
-            localStorage.setItem('userName', myName);
-            saveToURL();
-            
-            // Обновляем свой попап
-            if (myMarker) {
-                myMarker.setPopupContent(`
-                    <b>Это вы</b><br>
-                    ${myName}<br>
-                    <button class="update-btn" onclick="updateMyPosition()">🔄 Обновить</button>
-                `);
-            }
+      // вспомогательная функция, если нужно вернуть эмодзи-заглушку
+      window.resetPhotoToEmoji = function (slotId) {
+        const slot = document.getElementById(slotId);
+        if (slot) slot.innerHTML = "<span>📸</span>";
+      };
+
+
+  setPhoto('o1', 'images/1.jpg');
+  setPhoto('o2', 'images/2.jpg');
+  setPhoto('o3', 'images/3');
+  setPhoto('o4', 'images/4.jpg');
+  setPhoto('o5', 'images/5.jpg');
+  setPhoto('o6', 'images/6.jpg');
+  setPhoto('o7', 'images/7.jpg');
+  setPhoto('o8', 'images/8.jpg');
+  setPhoto('o9', 'images/9.jpg');
+
+
+
+
+  setPhoto('i1', 'images/10.jpg');
+  setPhoto('i2', 'images/11.jpg');
+  setPhoto('i3', 'images/12.jpg');
+  setPhoto('i4', 'images/13.jpg');
+  setPhoto('i5', 'images/14.jpg');
+  setPhoto('i6', 'images/15.jpg');
+  setPhoto('i7', 'images/16.jpg');
+  setPhoto('i8', 'images/17.jpg');
+
+
+      // ---------- РАССТАНОВКА ФОТО ПО ОРБИТАМ ----------
+      function layoutPhotos() {
+        const area = document.getElementById("orbit-area");
+        if (!area) return;
+        const D = area.offsetWidth;
+        if (D === 0) return;
+        const R = D / 2;
+
+        // внешний круг: размер чуть крупнее, радиус 78% от R (чтобы красиво влезало)
+        const outerSize = Math.round(R * 0.32);
+        const outerRadius = R * 0.78;
+        outerIds.forEach((id, i) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.style.width = outerSize + "px";
+          el.style.height = outerSize + "px";
+          const angle =
+            ((2 * Math.PI) / outerIds.length) * i - Math.PI / 2 + outerAngle;
+          const left = R + outerRadius * Math.cos(angle) - outerSize / 2;
+          const top = R + outerRadius * Math.sin(angle) - outerSize / 2;
+          el.style.left = left + "px";
+          el.style.top = top + "px";
         });
 
-        // ========== КНОПКА ПОДЕЛИТЬСЯ ==========
-        document.getElementById('shareBtn').addEventListener('click', () => {
-            // Принудительно сохраняем
-            saveToURL();
-            
-            // Копируем ссылку
-            const url = window.location.href;
-            navigator.clipboard.writeText(url).then(() => {
-                alert('✅ Ссылка скопирована!\nОтправьте её друзьям — они увидят вас на карте');
-            }).catch(() => {
-                prompt('Скопируйте ссылку вручную:', url);
-            });
+        // внутренний круг: 5 фото, чуть меньше
+        const innerSize = Math.round(R * 0.24);
+        const innerRadius = R * 0.52;
+        innerIds.forEach((id, i) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.style.width = innerSize + "px";
+          el.style.height = innerSize + "px";
+          const angle =
+            ((2 * Math.PI) / innerIds.length) * i - Math.PI / 2 + innerAngle;
+          const left = R + innerRadius * Math.cos(angle) - innerSize / 2;
+          const top = R + innerRadius * Math.sin(angle) - innerSize / 2;
+          el.style.left = left + "px";
+          el.style.top = top + "px";
         });
+      }
 
-        // ========== ЗАПУСК ==========
-        getLocation();
+      function animationLoop() {
+        outerAngle += 0.0028; // плавное вращение внешних фото
+        innerAngle -= 0.0022; // внутренние чуть против часовой
+        layoutPhotos();
+        rafId = requestAnimationFrame(animationLoop);
+      }
 
-        // Добавляем стили для кнопки в попапе (глобально)
-        const style = document.createElement('style');
-        style.innerHTML = `
-            .update-btn {
-                background: #2a9d8f;
-                border: none;
-                color: black;
-                padding: 4px 10px;
-                border-radius: 20px;
-                font-weight: bold;
-                cursor: pointer;
-                margin-top: 5px;
-            }
-            .update-btn:hover {
-                background: #3bb9aa;
-            }
-        `;
-        document.head.appendChild(style);
-    })();
+      function startAnimations() {
+        if (rafId) cancelAnimationFrame(rafId);
+        layoutPhotos();
+        animationLoop();
+      }
+
+      // Отслеживание ресайза и начальная подгонка
+      let resizeTimer;
+      window.addEventListener("resize", () => {
+        if (resizeTimer) clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          layoutPhotos();
+        }, 100);
+      });
+
+      window.addEventListener("load", () => {
+        startAnimations();
+        // дополнительно: еще раз подстроить размеры если анимация изменила родителя
+        setTimeout(() => layoutPhotos(), 60);
+      });
+
+      // ----- лепестки / sparkles -----
+      function spawnPetals() {
+        const petalEmojis = ["🌸", "🌺", "💗", "✨", "🌹", "💕", "🌼", "🫧"];
+        for (let i = 0; i < 10; i++) {
+          setTimeout(() => {
+            const petal = document.createElement("div");
+            petal.className = "petal";
+            petal.textContent =
+              petalEmojis[Math.floor(Math.random() * petalEmojis.length)];
+            const size = 14 + Math.random() * 16;
+            const duration = 2.8 + Math.random() * 3.2;
+            const leftPos = Math.random() * 100;
+            petal.style.cssText = `left: ${leftPos}%; top: -30px; font-size: ${size}px; animation-duration: ${duration}s; opacity: 0.9; filter: drop-shadow(0 0 2px pink);`;
+            document.getElementById("petals").appendChild(petal);
+            setTimeout(() => petal.remove(), duration * 1000);
+          }, i * 120);
+        }
+      }
+
+      // ----- показ комплимента (нажатие сердечка) -----
+      function showCompliment() {
+        count++;
+        let newIndex;
+        do {
+          newIndex = Math.floor(Math.random() * compliments.length);
+        } while (newIndex === lastIdx && compliments.length > 1);
+        lastIdx = newIndex;
+        const comp = compliments[newIndex];
+        const cardElem = document.getElementById("card");
+        const emojiSpan = document.getElementById("cemoji");
+        const textSpan = document.getElementById("ctext");
+        const counterSpan = document.getElementById("counter");
+        const numSpan = document.getElementById("cnum");
+
+        emojiSpan.textContent = comp.e;
+        textSpan.textContent = comp.t;
+
+        // анимация появления карточки
+        cardElem.style.display = "none";
+        void cardElem.offsetWidth; // reflow
+        cardElem.style.display = "block";
+        cardElem.style.animation = "none";
+        void cardElem.offsetWidth;
+        cardElem.style.animation =
+          "popIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards";
+
+        counterSpan.style.display = "block";
+        numSpan.textContent = count;
+
+        // запускаем эффект лепестков
+        spawnPetals();
+
+        // дополнительно маленькая вибрация на касании (если поддерживается)
+        if (window.navigator && window.navigator.vibrate) {
+          window.navigator.vibrate(40);
+        }
+      }
+
+      // делаем функцию глобальной для кнопки
+      window.showCompliment = showCompliment;
+
+      // если нужно предустановить фото через data-атрибуты? дополнительно подготовим удобную инициализацию
+      // также выполним проверку: если в слоте есть заглушка и разработчик добавит позже — ок
+      console.log(
+        'Готово! Для вставки локальных фото используйте: setPhoto("o1", "путь/фото.jpg")',
+      );
+    </script>
+
+    <!-- БЛОК ПРИМЕР: как добавить ваши фото — раскомментируйте и пропишите свои пути к локальным изображениям -->
+    <!-- 
+<script>
+  // ========== ИНСТРУКЦИЯ: ВСТАВЬТЕ ССЫЛКИ НА ВАШИ ЛОКАЛЬНЫЕ ФОТО ==========
+  // Например, фото лежат в папке "my_photos" рядом с этим файлом.
+  // Изображения должны быть в форматах jpg, png, webp.
+  
+  // Внешнее кольцо (6 шт)
+  setPhoto('o1', 'my_photos/1.jpg');
+  setPhoto('o2', 'my_photos/2.jpg');
+  setPhoto('o3', 'my_photos/3.jpg');
+  setPhoto('o4', 'my_photos/4.jpg');
+  setPhoto('o5', 'my_photos/5.jpg');
+  setPhoto('o6', 'my_photos/6.jpg');
+  
+  // Внутреннее кольцо (5 фото)
+  setPhoto('i1', 'my_photos/7.jpg');
+  setPhoto('i2', 'my_photos/8.jpg');
+  setPhoto('i3', 'my_photos/9.jpg');
+  setPhoto('i4', 'my_photos/10.jpg');
+  setPhoto('i5', 'my_photos/11.jpg');
+  
+  // Если какой-то файл отсутствует — автоматически покажется эмодзи 📸.
 </script>
-
-</body>
+-->
+  </body>
 </html>
